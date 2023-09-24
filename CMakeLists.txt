@@ -3,6 +3,11 @@ cmake_minimum_required(VERSION 2.8.12)
 # Set extension name here
 set(TARGET_NAME arrow)
 
+# DuckDB's extension distribution supports vcpkg. As such, dependencies can be added in ./vcpkg.json and then
+# used in cmake with find_package. Feel free to remove or replace with other dependencies.
+# Note that it should also be removed from vcpkg.json to prevent needlessly installing it..
+find_package(OpenSSL REQUIRED)
+
 set(EXTENSION_NAME ${TARGET_NAME}_extension)
 project(${TARGET_NAME})
 include_directories(src/include)
@@ -40,7 +45,7 @@ ExternalProject_Add(
         -DARROW_BOOST_USE_SHARED=OFF -DARROW_BROTLI_USE_SHARED=OFF
         -DARROW_BZ2_USE_SHARED=OFF -DARROW_GFLAGS_USE_SHARED=OFF
         -DARROW_GRPC_USE_SHARED=OFF -DARROW_JEMALLOC_USE_SHARED=OFF
-        -DARROW_LZ4_USE_SHARED=OFF -DARROW_OPENSSL_USE_SHARED=OFF
+        -DARROW_LZ4_USE_SHARED=OFF -DARROW_OPENSSL_USE_SHARED=ON
         -DARROW_PROTOBUF_USE_SHARED=OFF -DARROW_SNAPPY_USE_SHARED=OFF
         -DARROW_THRIFT_USE_SHARED=OFF -DARROW_UTF8PROC_USE_SHARED=OFF
         -DARROW_ZSTD_USE_SHARED=OFF -DARROW_USE_GLOG=OFF -DARROW_WITH_BACKTRACE=OFF
@@ -52,6 +57,7 @@ ExternalProject_Add(
         UPDATE_COMMAND "")
 
 ExternalProject_Get_Property(ARROW_EP install_dir)
+
 add_library(arrow STATIC IMPORTED GLOBAL)
 set_target_properties(arrow PROPERTIES IMPORTED_LOCATION ${install_dir}/lib/libarrow.a)
 
@@ -59,6 +65,7 @@ set_target_properties(arrow PROPERTIES IMPORTED_LOCATION ${install_dir}/lib/liba
 add_library(${EXTENSION_NAME} STATIC ${EXTENSION_SOURCES})
 add_dependencies(${EXTENSION_NAME} ARROW_EP)
 target_link_libraries(${EXTENSION_NAME} PUBLIC arrow)
+target_link_libraries(${EXTENSION_NAME} PUBLIC OpenSSL::SSL OpenSSL::Crypto)
 target_include_directories(${EXTENSION_NAME} PRIVATE ${install_dir}/include)
 
 # create loadable extension
@@ -67,6 +74,7 @@ build_loadable_extension(${TARGET_NAME} ${PARAMETERS} ${EXTENSION_SOURCES})
 add_dependencies(${TARGET_NAME}_loadable_extension ARROW_EP)
 target_link_libraries(${TARGET_NAME}_loadable_extension arrow)
 target_include_directories(${TARGET_NAME}_loadable_extension PRIVATE ${install_dir}/include)
+target_link_libraries(${TARGET_NAME}_loadable_extension OpenSSL::SSL OpenSSL::Crypto)
 
 install(
         TARGETS ${EXTENSION_NAME}
